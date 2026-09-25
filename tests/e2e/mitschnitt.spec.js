@@ -65,9 +65,15 @@ test('the setup points at the script, which is served next to the app', async ({
   await open(page);
   const toggle = page.getByRole('button', { name: /One-time setup/ });
   await expect(toggle).toHaveAttribute('aria-expanded', 'true');
-  const cmd = page.locator('.setup code', { hasText: 'curl -L' });
-  const scriptUrl = (await cmd.textContent()).match(/curl -L (\S+)/)[1];
+  const cmd = page.locator('.setup code', { hasText: 'curl -fLO' });
+  const scriptUrl = (await cmd.textContent()).match(/curl -fLO (\S+)/)[1];
   expect(scriptUrl).toMatch(/\/ToolDeck\/mitschnitt\/ytmp4\.py$/);
+
+  // a-Shell garbles pasted lines that wrap over several terminal rows (holzschu/a-shell#1057).
+  for (const text of await page.locator('.setup code').allTextContents()) {
+    expect(text).not.toContain('\n');
+    expect(text.length).toBeLessThanOrEqual(80);
+  }
 
   const res = await request.get(scriptUrl);
   expect(res.ok()).toBe(true);

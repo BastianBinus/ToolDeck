@@ -37,9 +37,15 @@
   }
 
   const scriptUrl = new URL(`${import.meta.env.BASE_URL}mitschnitt/ytmp4.py`, location.origin).href;
+  // One short line per command: a-Shell garbles pasted lines that wrap over several
+  // terminal rows (holzschu/a-shell#1057), so nothing here may be chained into one long line.
   const COMMANDS = {
     install: 'pip install -U yt-dlp',
-    script: `mkdir -p ~/Documents/bin && curl -L ${scriptUrl} -o ~/Documents/bin/ytmp4.py`,
+    dir: 'mkdir -p ~/Documents/bin && cd ~/Documents/bin',
+    // A directory left at this path by an earlier attempt would silently swallow the download.
+    clean: 'rm -rf ytmp4.py',
+    fetch: `curl -fLO ${scriptUrl}`,
+    check: 'test -f ytmp4.py && echo OK || echo ERROR',
     shortcut: "python3 ~/Documents/bin/ytmp4.py '<Shortcut Input>'",
   };
   let copied = $state('');
@@ -118,8 +124,11 @@
       <li>
         <span class="n mono">02</span>
         <div>
-          <p>Fetch the download script in a-Shell:</p>
-          {@render command('script')}
+          <p>Fetch the download script in a-Shell, one line at a time. The last one has to print <b class="mono">OK</b>:</p>
+          {@render command('dir')}
+          {@render command('clean')}
+          {@render command('fetch')}
+          {@render command('check')}
         </div>
       </li>
       <li>
