@@ -1,0 +1,51 @@
+:root {
+  color-scheme: light dark;
+  --paper: #f3f0e8;
+  --card: #fbfaf6;
+  --ink: #1c1b18;
+  --muted: #6b675e;
+  --faint: #a29d91;
+  --line: #d8d2c4;
+  --accent: #b5452c;
+  --accent-soft: #f1ddd4;
+  --warn: #8a5a12;
+  --warn-soft: #f4e6c8;
+  --sans: "IBM Plex Sans", -apple-system, system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --gutter: max(18px, env(safe-area-inset-left));
+  --gutter-r: max(18px, env(safe-area-inset-right));
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #1b1a18;
+    --card: #242320;
+    --ink: #ebe7dd;
+    --muted: #a19c90;
+    --faint: #6f6a60;
+    --line: #37352f;
+    --accent: #e0785c;
+    --accent-soft: #3a2621;
+    --warn: #e8bd72;
+    --warn-soft: #3a2f1a;
+  }
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--paper);
+  color: var(--ink);
+  font: 16px/1.5 var(--sans);
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+}
+
+button { font: inherit; color: inherit; cursor: pointer; }
+button:disabled { cursor: default; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.mono { font-family: var(--mono); font-weight: 500; }
