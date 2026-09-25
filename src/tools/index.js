@@ -14,4 +14,11 @@ export const tools = [
     note: 'Whisper, auf dem Gerät',
     load: () => import('./tonspur/Tonspur.svelte'),
   },
+  {
+    id: 'mitschnitt',
+    name: 'Mitschnitt',
+    blurb: 'YouTube → MP4',
+    note: 'yt-dlp in a-Shell, per Kurzbefehl',
+    load: () => import('./mitschnitt/Mitschnitt.svelte'),
+  },
 ];

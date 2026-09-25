@@ -27,4 +27,8 @@ describe('tool registry', () => {
   it('includes Tonspur', () => {
     expect(tools.find((t) => t.id === 'tonspur')?.name).toBe('Tonspur');
   });
+
+  it('includes Mitschnitt', () => {
+    expect(tools.find((t) => t.id === 'mitschnitt')?.name).toBe('Mitschnitt');
+  });
 });

@@ -28,6 +28,10 @@ jobs:
       - name: Unit tests
         run: npm run test:unit
 
+      # The a-Shell script behind Mitschnitt; the runner's own Python is enough.
+      - name: Python tests
+        run: python3 -m unittest discover -s tests/python -v
+
       - name: Install Chromium for Playwright
         run: npx playwright install --with-deps chromium
 
