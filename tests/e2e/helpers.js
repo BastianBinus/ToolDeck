@@ -56,7 +56,7 @@ export const GARBAGE = () => {
 //   'slow'  like ok, but after the first segment waits for {type:'cancel'}
 //   'error' loading → error
 //   'loadfail' the worker script never loads: an error event, no messages
-// Segment text for a spoken chunk i is `Teil ${i + 1} gesprochen.`, language
+// Segment text for a spoken chunk i is `Part ${i + 1} spoken.`, language
 // alternating de/en; silent chunks give text '' and lang null, like worker.js.
 export async function installFakeWorker(page, mode = 'ok') {
   await page.addInitScript((initialMode) => {
@@ -117,7 +117,7 @@ export async function installFakeWorker(page, mode = 'ok') {
           index: i,
           start: c.start / 16000,
           end: c.end / 16000,
-          text: c.silent ? '' : `Teil ${i + 1} gesprochen.`,
+          text: c.silent ? '' : `Part ${i + 1} spoken.`,
           lang: c.silent ? null : i % 2 ? 'en' : 'de',
           ms: c.silent ? 0 : 400,
         });
@@ -169,17 +169,38 @@ export const fakeWorkers = (page) =>
     })),
   );
 
-// ---- deck navigation -------------------------------------------------------------
+// ---- navigation ----------------------------------------------------------------
 
-export const deck = (page) => page.locator('main.deck');
+export const stage = (page) => page.locator('main.shell');
+export const toolPage = (page, id) => page.locator(`.page[data-tool="${id}"]`);
 
-// Scroll the deck like a finished swipe would.
-export async function scrollDeckTo(page, index) {
-  await deck(page).evaluate((el, i) => el.scrollTo({ left: i * el.clientWidth, behavior: 'instant' }), index);
+// The tool with this id is open: its page is the one in the layer and the
+// layer is in view.
+export async function expectOpen(page, id) {
+  await expect(stage(page)).toHaveClass(/\bopen\b/);
+  await expect(page).toHaveURL(new RegExp(`#${id}$`));
+  await expect(toolPage(page, id)).toHaveClass(/\bon\b/);
+  await expect(toolPage(page, id)).not.toHaveAttribute('inert');
 }
 
-export async function currentLabel(page) {
-  return page.locator('header .label').textContent();
+export async function expectHome(page) {
+  await expect(stage(page)).not.toHaveClass(/\bopen\b/);
+  await expect.poll(() => page.evaluate(() => location.hash)).toBe('');
+  await expect(page.locator('section.home')).not.toHaveAttribute('inert');
+}
+
+// Opens a tool the way a person would with the drum: tap its row to bring it
+// under the band, then tap the Open button.
+export async function openFromHome(page, name) {
+  const row = page.locator('.drum .row', { hasText: name });
+  if ((await row.getAttribute('aria-current')) !== 'true') await row.click();
+  await expect(row).toHaveAttribute('aria-current', 'true');
+  await page.getByRole('button', { name: `Open ${name}`, exact: true }).click();
+}
+
+export async function goHome(page) {
+  await page.getByRole('button', { name: 'Tools', exact: true }).click();
+  await expectHome(page);
 }
 
 // Opens the Tonspur page from a deep link and waits for the component.
@@ -190,4 +211,4 @@ export async function openTonspur(page) {
 
 export const action = (page) => page.getByTestId('tonspur-action');
 export const status = (page) => page.getByRole('status');
-export const fileInput = (page) => page.locator('input[type=file][aria-label="Video wählen"]');
+export const fileInput = (page) => page.locator('input[type=file][aria-label="Choose video"]');

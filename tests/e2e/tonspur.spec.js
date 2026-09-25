@@ -6,8 +6,9 @@ import {
   GARBAGE,
   installFakeWorker,
   fakeWorkers,
-  scrollDeckTo,
-  currentLabel,
+  openFromHome,
+  goHome,
+  expectOpen,
   openTonspur,
   action,
   status,
@@ -26,10 +27,10 @@ const transcriptHeading = (page) => page.locator('section.transcript h3');
 const setMode = (page, mode) => page.evaluate((m) => (window.__fakeMode = m), mode);
 const workerCount = (page) => page.evaluate(() => window.__fakeWorkers.length);
 
-// Takes the file and presses "Transkribieren".
+// Takes the file and presses "Transcribe".
 async function choose(page, file) {
   await fileInput(page).setInputFiles(file);
-  await expect(action(page)).toHaveText('Transkribieren');
+  await expect(action(page)).toHaveText('Transcribe');
 }
 
 async function run(page, file) {
@@ -39,8 +40,8 @@ async function run(page, file) {
 
 async function runToEnd(page, file = LOUD_65()) {
   await run(page, file);
-  await expect(status(page)).toHaveText(/^Fertig in/);
-  await expect(action(page)).toHaveText('Nochmal');
+  await expect(status(page)).toHaveText(/^Done in/);
+  await expect(action(page)).toHaveText('Again');
 }
 
 test.describe('with the fake worker', () => {
@@ -50,10 +51,10 @@ test.describe('with the fake worker', () => {
 
   test('starts idle, with the example transcript and no worker', async ({ page }) => {
     await openTonspur(page);
-    await expect(action(page)).toHaveText('Video wählen');
-    await expect(status(page)).toHaveText('Bereit');
+    await expect(action(page)).toHaveText('Choose video');
+    await expect(status(page)).toHaveText('Ready');
     await expect(notice(page)).toBeHidden();
-    await expect(transcriptHeading(page)).toContainText('Beispiel');
+    await expect(transcriptHeading(page)).toContainText('Example');
     await expect(segments(page)).not.toHaveCount(0);
     await expect(copyButton(page)).toBeHidden();
     await expect(fileInput(page)).toHaveCount(1);
@@ -69,13 +70,13 @@ test.describe('with the fake worker', () => {
     expect(await workerCount(page)).toBe(0);
   });
 
-  test('"Video wählen" opens the file picker; picking a file makes it "Transkribieren"', async ({ page }) => {
+  test('"Choose video" opens the file picker; picking a file makes it "Transcribe"', async ({ page }) => {
     await openTonspur(page);
     const [chooser] = await Promise.all([page.waitForEvent('filechooser'), action(page).click()]);
     expect(chooser.isMultiple()).toBe(false);
     await chooser.setFiles(LOUD_65());
-    await expect(action(page)).toHaveText('Transkribieren');
-    await expect(status(page)).toHaveText('Bereit');
+    await expect(action(page)).toHaveText('Transcribe');
+    await expect(status(page)).toHaveText('Ready');
     await expect(page.locator('.stage .meta')).toContainText('interview.wav');
     expect(await workerCount(page)).toBe(0);
   });
@@ -111,7 +112,7 @@ test.describe('with the fake worker', () => {
 
     const rows = segments(page);
     await expect(rows).toHaveCount(3);
-    await expect(rows.locator('p')).toHaveText(['Teil 1 gesprochen.', 'Teil 2 gesprochen.', 'Teil 3 gesprochen.']);
+    await expect(rows.locator('p')).toHaveText(['Part 1 spoken.', 'Part 2 spoken.', 'Part 3 spoken.']);
     const tc = (s) =>
       [Math.floor(s / 3600), Math.floor(s / 60) % 60, Math.floor(s) % 60].map((n) => String(n).padStart(2, '0')).join(':');
     await expect(rows.locator('.tc')).toHaveText([
@@ -121,10 +122,10 @@ test.describe('with the fake worker', () => {
     ]);
     await expect(page.locator('.segment.quiet')).toHaveCount(0);
 
-    await expect(transcriptHeading(page)).not.toContainText('Beispiel');
+    await expect(transcriptHeading(page)).not.toContainText('Example');
     await expect(transcriptHeading(page)).toContainText('3/3');
     await expect(copyButton(page)).toBeVisible();
-    await expect(copyButton(page)).toHaveText('Text kopieren');
+    await expect(copyButton(page)).toHaveText('Copy text');
     await expect(notice(page)).toBeHidden();
     await expect(chip(page, 'model')).toBeEnabled();
   });
@@ -134,12 +135,12 @@ test.describe('with the fake worker', () => {
     await setMode(page, 'slow');
     await run(page, LOUD_65());
     // Slow mode answers part 1, then waits.
-    await expect(status(page)).toHaveText('Höre zu · Teil 2 von 3');
+    await expect(status(page)).toHaveText('Listening · part 2 of 3');
     await expect(segments(page)).toHaveCount(1);
     await expect(transcriptHeading(page)).toContainText('1/3');
   });
 
-  test('a silent part shows "Keine Sprache"', async ({ page }) => {
+  test('a silent part shows "No speech"', async ({ page }) => {
     await openTonspur(page);
     await runToEnd(page, WITH_SILENCE());
 
@@ -150,20 +151,20 @@ test.describe('with the fake worker', () => {
     const rows = segments(page);
     await expect(rows).toHaveCount(2);
     await expect(rows.nth(0)).not.toHaveClass(/\bquiet\b/);
-    await expect(rows.nth(0).locator('p')).toHaveText('Teil 1 gesprochen.');
+    await expect(rows.nth(0).locator('p')).toHaveText('Part 1 spoken.');
     await expect(rows.nth(1)).toHaveClass(/\bquiet\b/);
-    await expect(rows.nth(1).locator('p')).toHaveText('Keine Sprache');
+    await expect(rows.nth(1).locator('p')).toHaveText('No speech');
     // No language on a silent part.
     await expect(rows.nth(1).locator('.tc')).toHaveText(/^\d\d:\d\d:\d\d$/);
   });
 
-  test('Stopp cancels the run', async ({ page }) => {
+  test('Stop cancels the run', async ({ page }) => {
     await openTonspur(page);
     await setMode(page, 'slow');
     await run(page, LOUD_65());
 
-    await expect(action(page)).toHaveText('Stopp');
-    await expect(status(page)).toHaveText('Höre zu · Teil 2 von 3');
+    await expect(action(page)).toHaveText('Stop');
+    await expect(status(page)).toHaveText('Listening · part 2 of 3');
     // Settings and file are locked while it runs.
     await expect(chip(page, 'model')).toBeDisabled();
     await expect(chip(page, 'lang')).toBeDisabled();
@@ -171,8 +172,8 @@ test.describe('with the fake worker', () => {
     await expect(fileInput(page)).toBeDisabled();
 
     await action(page).click();
-    await expect(status(page)).toHaveText('Gestoppt');
-    await expect(action(page)).toHaveText('Nochmal');
+    await expect(status(page)).toHaveText('Stopped');
+    await expect(action(page)).toHaveText('Again');
 
     const [w] = await fakeWorkers(page);
     expect(w.messages.map((m) => m.type)).toEqual(['run', 'cancel']);
@@ -185,16 +186,16 @@ test.describe('with the fake worker', () => {
     await setMode(page, 'error');
     await run(page, LOUD_65());
 
-    await expect(status(page)).toHaveText('Etwas ist schiefgelaufen');
+    await expect(status(page)).toHaveText('Something went wrong');
     await expect(notice(page)).toBeVisible();
     await expect(notice(page)).toContainText('Failed to fetch');
-    await expect(action(page)).toHaveText('Nochmal');
+    await expect(action(page)).toHaveText('Again');
     await expect.poll(async () => (await fakeWorkers(page))[0].terminated).toBe(true);
 
     // The next run starts a fresh worker and clears the notice.
     await setMode(page, 'ok');
     await action(page).click();
-    await expect(status(page)).toHaveText(/^Fertig in/);
+    await expect(status(page)).toHaveText(/^Done in/);
     await expect(notice(page)).toBeHidden();
     const workers = await fakeWorkers(page);
     expect(workers).toHaveLength(2);
@@ -207,9 +208,9 @@ test.describe('with the fake worker', () => {
     await setMode(page, 'loadfail');
     await run(page, LOUD_65());
 
-    await expect(status(page)).toHaveText('Etwas ist schiefgelaufen');
+    await expect(status(page)).toHaveText('Something went wrong');
     await expect(notice(page)).toBeVisible();
-    await expect(action(page)).toHaveText('Nochmal');
+    await expect(action(page)).toHaveText('Again');
     await expect.poll(async () => (await fakeWorkers(page))[0].terminated).toBe(true);
   });
 
@@ -217,9 +218,9 @@ test.describe('with the fake worker', () => {
     await openTonspur(page);
     await run(page, GARBAGE());
 
-    await expect(status(page)).toHaveText('Ton konnte nicht gelesen werden');
+    await expect(status(page)).toHaveText('Could not read the audio');
     await expect(notice(page)).toBeVisible();
-    await expect(action(page)).toHaveText('Transkribieren');
+    await expect(action(page)).toHaveText('Transcribe');
     expect(await workerCount(page)).toBe(0);
   });
 
@@ -238,7 +239,7 @@ test.describe('with the fake worker', () => {
     }
     expect(await page.evaluate(() => localStorage.getItem('tonspur.model'))).toBe('small');
 
-    for (const name of ['Deutsch', 'Englisch', 'DE + EN', 'Deutsch', 'Englisch']) {
+    for (const name of ['German', 'English', 'DE + EN', 'German', 'English']) {
       await lang.click();
       await expect(lang).toHaveText(name);
     }
@@ -247,7 +248,7 @@ test.describe('with the fake worker', () => {
     await page.reload();
     await expect(action(page)).toBeVisible();
     await expect(model).toContainText('Small');
-    await expect(lang).toHaveText('Englisch');
+    await expect(lang).toHaveText('English');
 
     // The remembered settings go into the run.
     await runToEnd(page);
@@ -303,18 +304,18 @@ test.describe('with the fake worker', () => {
     expect(w.messages.find((m) => m.type === 'run').device).toBe('webgpu');
   });
 
-  test('"Text kopieren" copies the transcript', async ({ page, context, baseURL }) => {
+  test('"Copy text" copies the transcript', async ({ page, context, baseURL }) => {
     await context.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: new URL(baseURL).origin });
     await openTonspur(page);
     await runToEnd(page);
 
     await copyButton(page).click();
-    await expect(copyButton(page)).toHaveText('Kopiert ✓');
+    await expect(copyButton(page)).toHaveText('Copied ✓');
     expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(
-      'Teil 1 gesprochen. Teil 2 gesprochen. Teil 3 gesprochen.',
+      'Part 1 spoken. Part 2 spoken. Part 3 spoken.',
     );
     // The label goes back after a moment.
-    await expect(copyButton(page)).toHaveText('Text kopieren');
+    await expect(copyButton(page)).toHaveText('Copy text');
   });
 
   test('silent parts are left out of the copied text', async ({ page, context, baseURL }) => {
@@ -323,8 +324,8 @@ test.describe('with the fake worker', () => {
     await runToEnd(page, WITH_SILENCE());
 
     await copyButton(page).click();
-    await expect(copyButton(page)).toHaveText('Kopiert ✓');
-    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('Teil 1 gesprochen.');
+    await expect(copyButton(page)).toHaveText('Copied ✓');
+    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('Part 1 spoken.');
   });
 
   test('memory: leaving Tonspur after a run frees the worker; the next run makes a new one', async ({ page }) => {
@@ -332,16 +333,15 @@ test.describe('with the fake worker', () => {
     await runToEnd(page);
     expect((await fakeWorkers(page))[0].terminated).toBe(false);
 
-    await scrollDeckTo(page, 0);
-    await expect.poll(() => currentLabel(page)).toBe('00 · Übersicht');
+    await goHome(page);
     await expect.poll(async () => (await fakeWorkers(page))[0].terminated).toBe(true);
 
-    await scrollDeckTo(page, 1);
-    await expect.poll(() => currentLabel(page)).toBe('01 · Tonspur');
-    // The transcript is still there after swiping back.
+    await openFromHome(page, 'Tonspur');
+    await expectOpen(page, 'tonspur');
+    // The transcript is still there after coming back.
     await expect(segments(page)).toHaveCount(3);
     await action(page).click();
-    await expect(status(page)).toHaveText(/^Fertig in/);
+    await expect(status(page)).toHaveText(/^Done in/);
 
     const workers = await fakeWorkers(page);
     expect(workers).toHaveLength(2);
@@ -356,18 +356,17 @@ test.describe('with the fake worker', () => {
     await openTonspur(page);
     await setMode(page, 'slow');
     await run(page, LOUD_65());
-    await expect(status(page)).toHaveText('Höre zu · Teil 2 von 3');
+    await expect(status(page)).toHaveText('Listening · part 2 of 3');
 
-    await scrollDeckTo(page, 0);
-    await expect.poll(() => currentLabel(page)).toBe('00 · Übersicht');
+    await goHome(page);
     // Give an eager cleanup the chance to (wrongly) fire.
     await page.waitForTimeout(300);
     expect((await fakeWorkers(page))[0].terminated).toBe(false);
 
-    await scrollDeckTo(page, 1);
-    await expect.poll(() => currentLabel(page)).toBe('01 · Tonspur');
-    await expect(action(page)).toHaveText('Stopp');
+    await openFromHome(page, 'Tonspur');
+    await expectOpen(page, 'tonspur');
+    await expect(action(page)).toHaveText('Stop');
     await action(page).click();
-    await expect(status(page)).toHaveText('Gestoppt');
+    await expect(status(page)).toHaveText('Stopped');
   });
 });

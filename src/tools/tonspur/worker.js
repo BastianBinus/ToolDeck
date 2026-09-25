@@ -159,7 +159,7 @@ self.onmessage = async ({ data }) => {
       if (device !== 'webgpu') throw err;
       // WebKit on iPhone can report a WebGPU adapter and still fail to build
       // Whisper's sessions on it; the CPU path is slower but works.
-      post({ type: 'notice', text: 'Die GPU konnte das Modell nicht ausführen, deshalb läuft es jetzt auf der CPU.' });
+      post({ type: 'notice', text: 'The GPU could not run the model, so it now runs on the CPU.' });
       ctx = await load(modelKey, 'wasm');
     }
 

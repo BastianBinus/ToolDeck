@@ -1,17 +1,23 @@
 <script>
   import { onMount } from 'svelte';
   import Home from './Home.svelte';
+  import Icon from './Icon.svelte';
   import { tools } from './tools/index.js';
 
-  // Page 0 is the home page, page i is tools[i - 1].
-  const pages = [{ id: 'home', name: 'Übersicht' }, ...tools];
+  const pad = (n) => String(n).padStart(2, '0');
+  const indexOf = (hash) => tools.findIndex((t) => `#${t.id}` === hash);
 
-  let deck;
-  // Read the deep link before the hash-writing effect below first runs.
-  const start = Math.max(0, pages.findIndex((p) => `#${p.id}` === location.hash));
+  // The open tool (-1: the picker). `shown` is the tool the tool layer draws;
+  // it stays set while the layer slides back out.
+  const start = indexOf(location.hash);
   let current = $state(start);
-  // A tool is loaded the first time its page comes up and stays mounted after.
-  let opened = $state({});
+  let shown = $state(start);
+  let sel = $state(Math.max(0, start));
+  // Page transitions are off until after the first frame, so a deep link
+  // opens straight on its tool instead of sliding in.
+  let animate = $state(false);
+  // A tool is loaded the first time it is opened and stays mounted after.
+  let opened = $state(start >= 0 ? { [tools[start].id]: true } : {});
   const modules = {};
 
   function load(tool) {
@@ -19,150 +25,148 @@
     return modules[tool.id];
   }
 
-  function go(index, smooth = true) {
-    deck.scrollTo({ left: index * deck.clientWidth, behavior: smooth ? 'smooth' : 'instant' });
+  function show(index) {
+    current = index;
+    if (index >= 0) {
+      shown = index;
+      sel = index;
+      opened[tools[index].id] = true;
+    }
   }
 
-  $effect(() => {
-    const page = pages[current];
-    if (current > 0) opened[page.id] = true;
-    const hash = current === 0 ? '' : `#${page.id}`;
-    if (location.hash !== hash) history.replaceState(null, '', location.pathname + location.search + hash);
-  });
-
-  // The page that covers most of the deck is the current one. Worked out from
-  // the scroll position rather than IntersectionObserver, whose isIntersecting
-  // WebKit reports true for pages that merely touch the edge.
-  function onScroll() {
-    const index = Math.round(deck.scrollLeft / deck.clientWidth);
-    if (index !== current && index >= 0 && index < pages.length) current = index;
+  function open(index) {
+    const hash = `#${tools[index].id}`;
+    // Marked so that Back knows it can pop this entry to get home.
+    if (location.hash !== hash) history.pushState({ fromHome: true }, '', hash);
+    show(index);
   }
 
-  function onHash() {
-    const index = pages.findIndex((p) => `#${p.id}` === location.hash);
-    go(Math.max(0, index));
+  function back() {
+    if (history.state?.fromHome) {
+      history.back();
+    } else {
+      // A deep link has nothing to go back to: go home in place.
+      history.replaceState(null, '', location.pathname + location.search);
+    }
+    show(-1);
+  }
+
+  // Browser back/forward and a hash typed or set by hand.
+  function sync() {
+    const index = indexOf(location.hash);
+    if (index !== current) show(index);
   }
 
   onMount(() => {
-    if (start > 0) go(start, false);
-
-    // Rotating the phone changes the page width; keep the same page in view.
-    const ro = new ResizeObserver(() => go(current, false));
-    ro.observe(deck);
-
-    return () => ro.disconnect();
+    requestAnimationFrame(() => requestAnimationFrame(() => (animate = true)));
   });
 </script>
 
-<header class="bar">
-  <button class="brand" type="button" onclick={() => go(0)} aria-label="Zur Übersicht">
-    <svg class="mark" viewBox="0 0 20 16" aria-hidden="true"><rect x="5.5" y="1" width="13.5" height="10" rx="1.5"/><rect x="1" y="5" width="13.5" height="10" rx="1.5"/></svg>ToolDeck
-  </button>
-  <nav class="ticks" aria-label="Seiten">
-    <span class="label mono">{String(current).padStart(2, '0')} · {pages[current].name}</span>
-    {#each pages as page, i (page.id)}
-      <button
-        type="button"
-        class="tick"
-        class:on={i === current}
-        aria-label={page.name}
-        aria-current={i === current ? 'page' : undefined}
-        onclick={() => go(i)}
-      ></button>
-    {/each}
-  </nav>
-</header>
+<svelte:window onhashchange={sync} onpopstate={sync} />
 
-<svelte:window onhashchange={onHash} />
-
-<main class="deck" bind:this={deck} onscroll={onScroll}>
-  <section class="page" data-index="0" aria-label="Übersicht" inert={current !== 0}>
-    <Home {tools} open={(i) => go(i + 1)} />
+<main class="shell" class:animate class:open={current >= 0}>
+  <section class="home" aria-label="Tools" inert={current >= 0}>
+    <Home {tools} bind:sel {open} />
   </section>
 
-  {#each tools as tool, i (tool.id)}
-    <section class="page" data-index={i + 1} aria-label={tool.name} inert={current !== i + 1}>
-      {#if opened[tool.id]}
-        {#await load(tool)}
-          <p class="loading mono">Lade {tool.name} …</p>
-        {:then Tool}
-          <Tool active={current === i + 1} />
-        {:catch}
-          <!-- Browsers remember a failed module import by URL, so only a reload retries it. -->
-          <p class="loading mono">
-            {tool.name} konnte nicht geladen werden. Offline?
-            <button type="button" class="retry" onclick={() => location.reload()}>Neu laden</button>
-          </p>
-        {/await}
-      {/if}
-    </section>
-  {/each}
+  <section class="layer" aria-label={shown >= 0 ? tools[shown].name : undefined} inert={current < 0}>
+    <nav class="nav">
+      <button type="button" class="back" onclick={back}><span aria-hidden="true">‹</span>Tools</button>
+      <span class="count mono">{pad(Math.max(0, shown) + 1)} / {pad(tools.length)}</span>
+    </nav>
+
+    <div class="pages">
+      {#each tools as tool, i (tool.id)}
+        {#if opened[tool.id]}
+          <div class="page" class:on={i === shown} data-tool={tool.id} inert={i !== current}>
+            <header class="tool-head">
+              <span class="tile"><Icon name={tool.icon} size={26} /></span>
+              <div>
+                <h1>{tool.name}</h1>
+                <p class="sub mono">{tool.sub}</p>
+              </div>
+            </header>
+            {#await load(tool)}
+              <p class="loading mono">Loading {tool.name} …</p>
+            {:then Tool}
+              <Tool active={current === i} />
+            {:catch}
+              <!-- Browsers remember a failed module import by URL, so only a reload retries it. -->
+              <p class="loading mono">
+                {tool.name} could not be loaded. Offline?
+                <button type="button" class="retry" onclick={() => location.reload()}>Reload</button>
+              </p>
+            {/await}
+          </div>
+        {/if}
+      {/each}
+    </div>
+  </section>
 </main>
 
 <style>
-  :global(#app) {
-    height: 100dvh;
-    display: grid;
-    grid-template-rows: auto 1fr;
-  }
+  :global(#app) { height: 100dvh; }
 
-  .bar {
-    display: flex; align-items: center; justify-content: space-between; gap: 12px;
-    padding: max(10px, env(safe-area-inset-top)) var(--gutter-r) 10px var(--gutter);
-    border-bottom: 1px solid var(--line);
-    background: var(--paper);
-  }
-  .brand {
-    display: flex; align-items: center; gap: 9px;
-    border: 0; background: none; padding: 6px 0;
-    font-size: 16px; font-weight: 600; letter-spacing: -0.01em;
-  }
-  .mark { width: 20px; height: 16px; fill: var(--paper); stroke: var(--ink); stroke-width: 1.5; }
-  .ticks { display: flex; align-items: center; gap: 2px; min-width: 0; }
-  .label {
-    font-size: 11px; color: var(--muted); margin-right: 8px;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  }
-  .tick {
-    width: 22px; height: 44px; border: 0; padding: 0; background: none;
-    display: grid; place-items: center;
-  }
-  .tick::after {
-    content: ""; width: 14px; height: 3px; border-radius: 2px;
-    background: var(--line); transition: background 0.2s;
-  }
-  .tick.on::after { background: var(--ink); }
+  .shell { position: relative; height: 100%; overflow: hidden; }
 
-  .deck {
-    display: flex;
-    overflow-x: auto; overflow-y: hidden;
-    scroll-snap-type: x mandatory;
-    overscroll-behavior-x: contain;
-    scrollbar-width: none;
+  .home, .layer {
+    position: absolute; inset: 0;
+    background: var(--bg);
   }
-  .deck::-webkit-scrollbar { display: none; }
+  .animate .home, .animate .layer { transition: transform 0.42s var(--ease-page); }
+  .open .home { transform: translateX(-30%); }
+  .layer { transform: translateX(105%); display: grid; grid-template-rows: auto 1fr; }
+  .open .layer { transform: none; }
 
+  .nav {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: max(10px, env(safe-area-inset-top)) var(--gutter-r) 4px calc(var(--gutter) - 10px);
+    background: var(--bg);
+    border-bottom: 1px solid var(--raised);
+  }
+  .back {
+    display: flex; align-items: center; gap: 4px;
+    border: 0; background: none; padding: 8px 10px;
+    color: var(--accent); font-size: 16px; font-weight: 500;
+  }
+  .back span { font-size: 24px; line-height: 16px; margin-top: -3px; }
+  .count { font-size: 11px; color: var(--faint); }
+
+  .pages { position: relative; min-height: 0; }
   .page {
-    flex: 0 0 100%;
-    min-width: 0;
+    position: absolute; inset: 0;
     overflow-y: auto;
-    /* Something too wide inside a tool must not turn the page into a second
-       horizontal scroller competing with the deck. */
+    /* Something too wide inside a tool must not scroll the page sideways. */
     overflow-x: clip;
     overscroll-behavior-y: contain;
-    scroll-snap-align: start;
-    /* One page per swipe, even on a hard fling. */
-    scroll-snap-stop: always;
+    visibility: hidden;
+    display: flex; flex-direction: column;
+    --gutter: max(16px, env(safe-area-inset-left));
+    --gutter-r: max(16px, env(safe-area-inset-right));
   }
+  .page.on { visibility: visible; }
+
+  .tool-head {
+    display: flex; align-items: center; gap: 14px;
+    width: 100%; max-width: 620px; margin: 0 auto;
+    padding: 22px calc(var(--gutter-r) + 2px) 0 calc(var(--gutter) + 2px);
+  }
+  .tile {
+    flex: none; width: 48px; height: 48px; border-radius: 13px;
+    display: grid; place-items: center;
+    background: var(--accent); color: var(--on-accent);
+  }
+  h1 { margin: 0; font-size: 30px; line-height: 1.1; font-weight: 600; letter-spacing: -0.025em; }
+  .sub { margin: 2px 0 0; font-size: 12px; line-height: 1.4; color: var(--muted); }
 
   .retry {
     display: block; margin-top: 12px;
     border: 1px solid var(--line); background: var(--card);
-    border-radius: 8px; padding: 8px 12px; font-size: 14px;
+    border-radius: 10px; padding: 8px 12px; font-size: 14px;
   }
-  .loading { padding: 28px var(--gutter-r) 0 var(--gutter); color: var(--muted); font-size: 13px; }
+  .loading { padding: 20px var(--gutter-r) 0 var(--gutter); color: var(--muted); font-size: 13px; }
 
   @media (prefers-reduced-motion: reduce) {
-    .tick::after { transition: none; }
+    .animate .home, .animate .layer { transition: none; }
   }
 </style>

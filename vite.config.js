@@ -13,16 +13,16 @@ export default defineConfig({
       // A new version waits until the app is fully closed. autoUpdate would take
       // over an open app and delete the chunks its lazy tools still need.
       registerType: 'prompt',
-      includeAssets: ['favicon.svg', 'apple-touch-icon.png'],
+      includeAssets: ['favicon.svg', 'apple-touch-icon.png', 'icons/*.svg'],
       manifest: {
         name: 'ToolDeck',
         short_name: 'ToolDeck',
-        description: 'Kleine Werkzeuge, die auf dem Gerät laufen.',
+        description: 'Small tools that run on the device.',
         start_url: base,
         scope: base,
         display: 'standalone',
-        background_color: '#f3f0e8',
-        theme_color: '#f3f0e8',
+        background_color: '#141412',
+        theme_color: '#141412',
         icons: [
           { src: 'icon-192.png', sizes: '192x192', type: 'image/png' },
           { src: 'icon-512.png', sizes: '512x512', type: 'image/png' },

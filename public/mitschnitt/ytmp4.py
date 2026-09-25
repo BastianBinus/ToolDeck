@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-"""Ein YouTube-Video als MP4 speichern. Gedacht für a-Shell auf dem iPhone.
+"""Save a YouTube video as MP4. Made for a-Shell on the iPhone.
 
-    python3 ytmp4.py '<YouTube-Link>'           beste Qualität
-    python3 ytmp4.py '<Link>#h=720'             höchstens 720p (so schickt es ToolDeck)
-    python3 ytmp4.py '<Link>' 1080              dasselbe als zweites Argument
+    python3 ytmp4.py '<YouTube link>'           best quality
+    python3 ytmp4.py '<link>#h=720'             at most 720p (what ToolDeck sends)
+    python3 ytmp4.py '<link>' 1080              the same as a second argument
 
-Die Datei landet in ~/Documents/YouTube, in der Dateien-App unter a-Shell.
-Braucht yt-dlp (pip install -U yt-dlp). Ohne ffmpeg gibt es nur die MP4-Formate,
-in denen Bild und Ton schon zusammen liegen; bei YouTube meist höchstens 360p.
+The file lands in ~/Documents/YouTube, in the Files app under a-Shell.
+Needs yt-dlp (pip install -U yt-dlp). Without ffmpeg there are only the MP4
+formats with picture and sound already combined; on YouTube usually 360p at most.
 """
 import os
 import re
@@ -26,7 +26,7 @@ OUT = os.path.expanduser("~/Documents/YouTube")
 def parse(args):
     """(video_id, height or None) from the command line; raises ValueError."""
     if not args:
-        raise ValueError("Kein Link angegeben.")
+        raise ValueError("No link given.")
     text = args[0].strip()
     height = None
     m = re.search(r"#h=([^#]*)$", text)
@@ -35,13 +35,13 @@ def parse(args):
     if len(args) > 1:
         height = args[1].strip().rstrip("p")
     if height is not None and height not in HEIGHTS:
-        raise ValueError(f"Unbekannte Höhe: {height}")
+        raise ValueError(f"Unknown height: {height}")
 
     if ID.fullmatch(text):
         return text, height
     m = LINK.search(text)
     if not m:
-        raise ValueError(f"Kein YouTube-Link: {text}")
+        raise ValueError(f"Not a YouTube link: {text}")
     return m.group(1), height
 
 
@@ -67,12 +67,12 @@ def main(argv):
         from yt_dlp import YoutubeDL
         from yt_dlp.postprocessor.ffmpeg import FFmpegPostProcessor
     except ImportError:
-        print("yt-dlp fehlt. Einmal ausführen: pip install -U yt-dlp", file=sys.stderr)
+        print("yt-dlp is missing. Run once: pip install -U yt-dlp", file=sys.stderr)
         return 1
 
     merge = FFmpegPostProcessor().available
     if not merge:
-        print("Hinweis: kein ffmpeg gefunden, die Qualität ist deshalb begrenzt.")
+        print("Note: no ffmpeg found, so the quality is limited.")
 
     os.makedirs(OUT, exist_ok=True)
     options = {
@@ -85,15 +85,15 @@ def main(argv):
         with YoutubeDL(options) as ydl:
             info = ydl.extract_info(f"https://www.youtube.com/watch?v={vid}")
     except Exception as e:
-        print(f"\nFehlgeschlagen: {e}", file=sys.stderr)
-        print("Oft hilft ein Update: pip install -U yt-dlp", file=sys.stderr)
+        print(f"\nFailed: {e}", file=sys.stderr)
+        print("An update often helps: pip install -U yt-dlp", file=sys.stderr)
         return 1
 
     done = (info.get("requested_downloads") or [{}])[0]
     path = done.get("filepath") or OUT
-    size = f"{done['height']}p" if done.get("height") else "unbekannte Auflösung"
-    print(f"\nFertig ({size}): {path}")
-    print("Zu finden in Dateien → a-Shell → YouTube.")
+    size = f"{done['height']}p" if done.get("height") else "unknown resolution"
+    print(f"\nDone ({size}): {path}")
+    print("Find it in Files → a-Shell → YouTube.")
     return 0
 
 

@@ -52,9 +52,9 @@ describe('target', () => {
 });
 
 describe('QUALITY_ORDER', () => {
-  it('holds every quality once, starting at 720p', () => {
+  it('holds every quality once, lowest first, best last', () => {
     expect([...QUALITY_ORDER].sort()).toEqual(Object.keys(QUALITIES).sort());
-    expect(QUALITY_ORDER[0]).toBe('720');
+    expect(QUALITY_ORDER).toEqual(['360', '720', '1080', 'best']);
   });
 });
 

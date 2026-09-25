@@ -65,7 +65,7 @@ class Formats(unittest.TestCase):
 
 class Main(unittest.TestCase):
     def test_bad_input_exits_2_before_importing_yt_dlp(self):
-        self.assertEqual(ytmp4.main(["kein link"]), 2)
+        self.assertEqual(ytmp4.main(["not a link"]), 2)
 
 
 if __name__ == "__main__":

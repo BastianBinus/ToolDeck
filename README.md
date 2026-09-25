@@ -1,50 +1,58 @@
 # ToolDeck
 
-Eine persönliche Sammlung kleiner Werkzeuge fürs iPhone. Sie laufen komplett im Browser, ohne Konto, Paywall oder Upload.
-Das Ganze ist eine PWA: in Safari öffnen, dann *Teilen → Zum Home-Bildschirm*.
+A personal collection of small tools for the iPhone. They run entirely in the browser, with no account, paywall or upload.
+It is a PWA: open it in Safari, then *Share → Add to Home Screen*.
 
-Die Startseite ist Seite 0, rechts daneben liegt jedes Werkzeug als eigene Seite (horizontal wischen).
+The home page is a picker wheel (drum or dial, switched with the toggle at the top right). Opening a tool slides its page in;
+*‹ Tools* goes back. Each tool also has its own address (`#tonspur`, `#mitschnitt`), so deep links and the browser's back button work.
 
-| Nr. | Werkzeug | Was |
+| No. | Tool | What |
 |---|---|---|
-| 01 | Tonspur | Video/Audio → Text mit Whisper auf dem Gerät ([Original](https://github.com/BastianBinus/Tonspur)) |
-| 02 | Mitschnitt | YouTube → MP4. Startet einen Kurzbefehl, der yt-dlp in [a-Shell](https://github.com/holzschu/a-shell) ausführt |
+| 01 | Tonspur | Video/audio → text with Whisper on the device ([original](https://github.com/BastianBinus/Tonspur)) |
+| 02 | Mitschnitt | YouTube → MP4. Starts a Shortcut that runs yt-dlp in [a-Shell](https://github.com/holzschu/a-shell) |
 
-## Entwicklung
+The design (tokens, typography, components, picker, icons) is in [`docs/DESIGN.md`](docs/DESIGN.md).
+
+## Development
 
 ```sh
 npm install
 npm run dev          # http://localhost:5173/ToolDeck/
-npm run build        # nach dist/
+npm run build        # to dist/
 npm run test:unit    # Vitest
-npm run test:e2e     # Playwright (baut und startet vite preview selbst)
+npm run test:e2e     # Playwright (builds and starts vite preview itself)
 npm run test:all
 python3 -m unittest discover -s tests/python   # ytmp4.py (Mitschnitt)
 ```
 
-Stack: Vite 8, Svelte 5, vite-plugin-pwa (Workbox). Deploy über GitHub Pages per Action bei Push auf `main`
-(einmalig in den Repo-Settings *Pages → Source: GitHub Actions* setzen). Für einen anderen Host mit `BASE=/ npm run build` bauen.
+Stack: Vite 8, Svelte 5, vite-plugin-pwa (Workbox). Deployed to GitHub Pages by an Action on push to `main`
+(set *Pages → Source: GitHub Actions* once in the repo settings). For another host, build with `BASE=/ npm run build`.
 
-## Ein Werkzeug hinzufügen
+## Adding a tool
 
-1. Ordner `src/tools/<id>/` mit einer Svelte-Komponente anlegen.
-2. Eintrag in `src/tools/index.js` (`id`, `name`, `blurb`, `note`, `load`).
+1. Create a folder `src/tools/<id>/` with a Svelte component.
+2. Add an entry to `src/tools/index.js` (`id`, `name`, `blurb`, `note`, `sub`, `icon`, `load`).
+3. Add its icon to `public/icons/<icon>.svg`, following the icon rules in `docs/DESIGN.md`.
 
-Vertrag für jede Komponente:
+The app draws the tool's header (icon tile, name, `sub`); the component starts below it.
 
-- Sie bekommt die Prop `active`. Ist sie `true`, liegt die Seite gerade im Bild.
-- Nach dem ersten Öffnen bleibt sie gemountet, ihr Zustand überlebt also das Wegwischen.
-- Speicherfresser wie Worker, Modelle oder große Buffer gibt sie selbst frei, sobald `active` auf `false` fällt und nichts läuft. iOS lädt sonst den ganzen Tab neu.
-- Kein `position: fixed`, denn die Seiten liegen nebeneinander. Für Leisten unten `position: sticky` nehmen.
-- Nur die Farb- und Schrift-Variablen aus `src/app.css` verwenden, dann funktioniert Hell/Dunkel automatisch.
+Contract for every component:
 
-## Bekannte Grenzen
+- It receives the prop `active`. When it is `true`, the tool's page is on screen.
+- After it is first opened it stays mounted, so its state survives going back to the picker.
+- It frees memory hogs such as workers, models or large buffers itself as soon as `active` turns `false` and nothing is running.
+  Otherwise iOS reloads the whole tab.
+- No `position: fixed`: every opened tool stays mounted in its own page. Use `position: sticky` for bars at the bottom.
+- Only use the colour and font variables from `src/app.css`. The app is dark only.
 
-- Die e2e-Tests laufen in Chromium mit iPhone-Viewport. Echtes WebKit/iOS-Safari testen sie nicht.
-- Tonspur lädt transformers.js von jsDelivr und die Modelle von Hugging Face. Beides wird beim ersten Lauf gecacht, danach läuft es offline.
-- Updates greifen erst, wenn die App komplett geschlossen wurde (App-Umschalter → wegwischen). Eine offene App übernimmt eine neue Version absichtlich nicht, weil sonst die Dateien ihrer lazy geladenen Werkzeuge verschwinden würden.
-- Tonspur läuft single-threaded, weil GitHub Pages keine COOP/COEP-Header senden kann.
-- Mitschnitt lädt nicht im Browser. Safari kommt wegen CORS nicht an die YouTube-Streams, und YouTube verlangt inzwischen PO-Tokens.
-  Die Seite ruft nur den Kurzbefehl `ToolDeck YT` auf, der `public/mitschnitt/ytmp4.py` in a-Shell startet. Die Einrichtung steht auf der Seite.
-- Ohne ffmpeg bekommt yt-dlp in a-Shell nur Formate, in denen Bild und Ton schon zusammen liegen (bei YouTube meist 360p). Ob das
-  WebAssembly-ffmpeg aus `pkg install ffmpeg` von yt-dlp genutzt wird, ist nicht getestet. yt-dlp muss ab und zu mit `pip install -U yt-dlp` aktualisiert werden.
+## Known limits
+
+- The e2e tests run in Chromium with an iPhone viewport. They do not test real WebKit/iOS Safari.
+- Tonspur loads transformers.js from jsDelivr and the models from Hugging Face. Both are cached on the first run and work offline after that.
+- Updates only apply once the app has been closed completely (app switcher → swipe away). An open app deliberately does not take over
+  a new version, because the files of its lazily loaded tools would otherwise disappear.
+- Tonspur runs single-threaded because GitHub Pages cannot send COOP/COEP headers.
+- Mitschnitt does not download in the browser. Safari cannot reach the YouTube streams because of CORS, and YouTube now requires PO tokens.
+  The page only calls the Shortcut `ToolDeck YT`, which starts `public/mitschnitt/ytmp4.py` in a-Shell. The setup is described on the page.
+- Without ffmpeg, yt-dlp in a-Shell only gets formats with picture and sound already combined (usually 360p on YouTube). Whether
+  yt-dlp uses the WebAssembly ffmpeg from `pkg install ffmpeg` is not tested. yt-dlp has to be updated now and then with `pip install -U yt-dlp`.
