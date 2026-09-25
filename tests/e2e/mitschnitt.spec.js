@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 
 const ID = 'dQw4w9WgXcQ';
 const action = (page) => page.getByTestId('mitschnitt-action');
-const input = (page) => page.getByLabel('YouTube-Link');
+const input = (page) => page.getByLabel('YouTube link');
 
 async function open(page) {
   await page.goto('./#mitschnitt');
@@ -12,11 +12,11 @@ async function open(page) {
 test('the button stays off until a YouTube link is entered', async ({ page }) => {
   await open(page);
   await expect(action(page)).toBeDisabled();
-  await expect(page.getByTestId('mitschnitt-meta')).toHaveText('Link einfügen');
+  await expect(page.getByTestId('mitschnitt-meta')).toHaveText('Paste a link');
 
   await input(page).fill('https://example.com/x');
   await expect(action(page)).toBeDisabled();
-  await expect(page.getByTestId('mitschnitt-meta')).toHaveText('Kein YouTube-Link');
+  await expect(page.getByTestId('mitschnitt-meta')).toHaveText('Not a YouTube link');
   await expect(input(page)).toHaveAttribute('aria-invalid', 'true');
 
   await input(page).fill(`https://youtu.be/${ID}?si=tracking`);
@@ -29,32 +29,43 @@ test('the button stays off until a YouTube link is entered', async ({ page }) =>
   expect(url.searchParams.get('text')).toBe(`https://www.youtube.com/watch?v=${ID}#h=720`);
 });
 
-test('the quality chip cycles, changes the link and is remembered', async ({ page }) => {
+test('the quality segments change the link and are remembered', async ({ page }) => {
   await open(page);
   await input(page).fill(ID);
-  const chip = page.getByTestId('mitschnitt-quality');
-  await expect(chip).toContainText('720p');
+  const quality = page.getByTestId('mitschnitt-quality');
+  const segment = (label) => quality.getByRole('radio', { name: label });
+  await expect(quality.getByRole('radio', { checked: true })).toHaveText('720p');
 
-  await chip.tap();
-  await expect(chip).toContainText('1080p');
+  await segment('At most 1080p').tap();
+  await expect(segment('At most 1080p')).toHaveAttribute('aria-checked', 'true');
+  await expect(segment('At most 720p')).toHaveAttribute('aria-checked', 'false');
   await expect(action(page)).toHaveAttribute('href', /%23h%3D1080$/);
 
-  await chip.tap();
-  await expect(chip).toContainText('Beste');
+  await segment('Best, no limit').tap();
   const text = new URL(await action(page).getAttribute('href')).searchParams.get('text');
   expect(text).toBe(`https://www.youtube.com/watch?v=${ID}`);
 
   await page.reload();
-  await expect(page.getByTestId('mitschnitt-quality')).toContainText('Beste');
-  await page.getByTestId('mitschnitt-quality').tap();
-  await expect(page.getByTestId('mitschnitt-quality')).toContainText('360p');
+  await expect(page.getByTestId('mitschnitt-quality').getByRole('radio', { checked: true })).toHaveText('Best');
+  await page.getByTestId('mitschnitt-quality').getByRole('radio', { name: 'At most 360p' }).tap();
+  await input(page).fill(ID);
+  await expect(action(page)).toHaveAttribute('href', /%23h%3D360$/);
+});
+
+test('tapping Download shows where it went', async ({ page }) => {
+  await open(page);
+  await input(page).fill(ID);
+  // The shortcuts: link has nowhere to go in a test browser; only the toast matters.
+  await action(page).evaluate((a) => a.addEventListener('click', (e) => e.preventDefault()));
+  await action(page).tap();
+  await expect(page.locator('.mitschnitt').getByRole('status')).toHaveText('Opening Shortcuts → ToolDeck YT · 720p');
 });
 
 test('the setup points at the script, which is served next to the app', async ({ page, request }) => {
   await open(page);
-  const setup = page.locator('details.setup');
-  await expect(setup).toHaveAttribute('open', '');
-  const cmd = setup.locator('code', { hasText: 'curl -L' });
+  const toggle = page.getByRole('button', { name: /One-time setup/ });
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  const cmd = page.locator('.setup code', { hasText: 'curl -L' });
   const scriptUrl = (await cmd.textContent()).match(/curl -L (\S+)/)[1];
   expect(scriptUrl).toMatch(/\/ToolDeck\/mitschnitt\/ytmp4\.py$/);
 
@@ -63,10 +74,11 @@ test('the setup points at the script, which is served next to the app', async ({
   expect(await res.text()).toContain('from yt_dlp import YoutubeDL');
 
   // Closing it once keeps it closed.
-  await setup.locator('summary').tap();
-  await expect(setup).not.toHaveAttribute('open');
+  await toggle.tap();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  await expect(cmd).toBeHidden();
   await page.reload();
-  await expect(page.locator('details.setup')).not.toHaveAttribute('open');
+  await expect(page.getByRole('button', { name: /One-time setup/ })).toHaveAttribute('aria-expanded', 'false');
 });
 
 test.describe('at 375 px width', () => {
@@ -76,7 +88,7 @@ test.describe('at 375 px width', () => {
     await open(page);
     await input(page).fill(`https://www.youtube.com/watch?v=${ID}&list=PL${'x'.repeat(60)}`);
     const m = await page.evaluate(() => {
-      const p = document.querySelector('section.page[aria-label="Mitschnitt"]');
+      const p = document.querySelector('.page[data-tool="mitschnitt"]');
       return { scroll: p.scrollWidth, client: p.clientWidth, body: document.scrollingElement.scrollWidth };
     });
     expect(m.scroll).toBeLessThanOrEqual(m.client);

@@ -1,76 +1,66 @@
 <script>
-  let { tools, open } = $props();
+  import Icon from './Icon.svelte';
+  import Drum from './picker/Drum.svelte';
+  import Dial from './picker/Dial.svelte';
 
-  const today = new Date().toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  let { tools, sel = $bindable(), open } = $props();
+
+  const KEY = 'tooldeck.picker';
+  let mode = $state(read() === 'dial' ? 'dial' : 'drum');
+
+  function read() { try { return localStorage.getItem(KEY); } catch { return null; } }
+  function pick(next) {
+    mode = next;
+    try { localStorage.setItem(KEY, next); } catch {}
+  }
 </script>
 
 <div class="home">
-  <div class="head">
-    <h1>Werkzeuge</h1>
-    <span class="date mono">{today}</span>
-  </div>
-
-  <ol class="index">
-    <li class="rule mono" aria-hidden="true"><span>Nr.</span><span>Werkzeug</span></li>
-    {#each tools as tool, i (tool.id)}
-      <li>
-        <button type="button" class="card" onclick={() => open(i)}>
-          <span class="num mono">{String(i + 1).padStart(2, '0')}</span>
-          <span class="text">
-            <span class="name">{tool.name}</span>
-            <span class="blurb">{tool.blurb}</span>
-            <span class="note mono">{tool.note}</span>
-          </span>
-          <span class="arrow" aria-hidden="true">→</span>
+  <header class="bar">
+    <h1 class="brand">
+      <svg class="mark" viewBox="0 0 20 16" aria-hidden="true"><rect x="5.5" y="1" width="13.5" height="10" rx="1.5"/><rect x="1" y="5" width="13.5" height="10" rx="1.5"/></svg>ToolDeck
+    </h1>
+    <div class="toggle" role="group" aria-label="Picker">
+      {#each [['drum', 'Drum'], ['dial', 'Dial']] as [key, label] (key)}
+        <button type="button" aria-label={label} aria-pressed={mode === key} class:on={mode === key} onclick={() => pick(key)}>
+          <Icon name="picker-{key}" size={18} />
         </button>
-      </li>
-    {/each}
-  </ol>
+      {/each}
+    </div>
+  </header>
 
-  <p class="foot">
-    Alles läuft auf diesem Gerät, nichts wird hochgeladen. Nach links wischen, um durch die Werkzeuge zu blättern.
-  </p>
+  {#if mode === 'drum'}
+    <Drum {tools} bind:sel {open} />
+  {:else}
+    <Dial {tools} bind:sel {open} />
+  {/if}
 </div>
 
 <style>
   .home {
-    max-width: 620px; margin: 0 auto;
-    padding: 28px var(--gutter-r) max(40px, env(safe-area-inset-bottom)) var(--gutter);
-    display: grid; gap: 22px;
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column;
+    overflow: hidden;
   }
-  .head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
-  h1 { margin: 0; font-size: 34px; line-height: 1.1; font-weight: 600; letter-spacing: -0.025em; }
-  .date { font-size: 12px; color: var(--muted); }
+  .bar {
+    flex: none;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: max(12px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) 0 var(--gutter);
+  }
+  .brand {
+    display: flex; align-items: center; gap: 9px; margin: 0;
+    font-size: 16px; font-weight: 600; line-height: 1.5;
+  }
+  .mark { width: 20px; height: 16px; fill: var(--bg); stroke: var(--ink); stroke-width: 1.5; }
 
-  .index {
-    list-style: none; margin: 0; padding: 0;
-    background: var(--card);
-    border: 1px solid var(--line);
-    border-radius: 6px;
-    box-shadow: 0 1px 0 var(--line), 0 10px 24px -18px rgb(0 0 0 / 0.35);
+  .toggle {
+    display: flex; gap: 2px; padding: 3px;
+    background: var(--card); border: 1px solid var(--line); border-radius: 12px;
   }
-  /* The red header rule of an index card. */
-  .rule {
-    display: grid; grid-template-columns: 44px 1fr;
-    padding: 12px 16px 8px;
-    font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--faint);
-    border-bottom: 1.5px solid var(--accent);
+  .toggle button {
+    width: 40px; height: 32px; border: 0; border-radius: 9px;
+    display: grid; place-items: center;
+    background: transparent; color: var(--muted);
   }
-  li + li:not(.rule) { border-top: 1px solid var(--line); }
-  li.rule + li { border-top: 0; }
-
-  .card {
-    width: 100%;
-    display: grid; grid-template-columns: 44px 1fr auto; align-items: start; gap: 0;
-    padding: 16px; border: 0; background: none; text-align: left;
-  }
-  .card:active { background: var(--paper); }
-  .num { font-size: 13px; color: var(--accent); padding-top: 3px; }
-  .text { display: grid; gap: 2px; min-width: 0; }
-  .name { font-size: 19px; font-weight: 600; letter-spacing: -0.01em; }
-  .blurb { color: var(--muted); font-size: 15px; }
-  .note { color: var(--faint); font-size: 11px; margin-top: 4px; }
-  .arrow { font-size: 20px; color: var(--muted); padding-top: 1px; }
-
-  .foot { margin: 0; color: var(--muted); font-size: 13px; max-width: 52ch; }
+  .toggle button.on { background: var(--ink); color: var(--on-accent); }
 </style>

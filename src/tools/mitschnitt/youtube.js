@@ -8,10 +8,10 @@ const ID = /^[A-Za-z0-9_-]{11}$/;
 const HOSTS = /^(?:(?:www|m|music)\.)?youtube(?:-nocookie)?\.com$/;
 const PATHS = /^\/(?:shorts|live|embed|v|e)\/([^/?#]+)/;
 
-export const QUALITIES = { 360: '360p', 720: '720p', 1080: '1080p', best: 'Beste' };
-// Tap order of the quality chip. Not Object.keys(QUALITIES): integer-like keys
-// always come out sorted, whatever order the literal has.
-export const QUALITY_ORDER = ['720', '1080', 'best', '360'];
+export const QUALITIES = { 360: '360p', 720: '720p', 1080: '1080p', best: 'Best' };
+// Order of the quality segments. Not Object.keys(QUALITIES): integer-like keys
+// always come out sorted, and 'best' has to stay last on its own terms.
+export const QUALITY_ORDER = ['360', '720', '1080', 'best'];
 export const SHORTCUT = 'ToolDeck YT';
 
 // The video id in a YouTube link, or null. Accepts youtube.com/watch?v=,

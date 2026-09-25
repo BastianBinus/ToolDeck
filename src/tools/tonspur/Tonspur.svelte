@@ -12,7 +12,7 @@
     set(k, v) { try { localStorage.setItem('tonspur.' + k, v); } catch {} },
   };
   const MODELS = { tiny: ['Tiny', '≈60 MB'], base: ['Base', '≈135 MB'], small: ['Small', '≈250 MB'] };
-  const LANGS = { auto: 'DE + EN', de: 'Deutsch', en: 'Englisch' };
+  const LANGS = { auto: 'DE + EN', de: 'German', en: 'English' };
   const hasGpu = 'gpu' in navigator;
   const settings = $state({
     model: store.get('model') in MODELS ? store.get('model') : 'base',
@@ -34,18 +34,18 @@
   // ---- main button -------------------------------------------------------------
   // idle: no file yet · ready: file chosen · running · again: a run has finished
   const PHASES = {
-    idle: ['Video wählen', ''],
-    ready: ['Transkribieren', 'go'],
-    running: ['Stopp', 'stop'],
-    again: ['Nochmal', 'go'],
+    idle: ['Choose video', 'go'],
+    ready: ['Transcribe', 'go'],
+    running: ['Stop', 'stop'],
+    again: ['Again', 'go'],
   };
   let phase = $state('idle');
   const busy = $derived(phase === 'running');
 
   // ---- what the page shows -----------------------------------------------------
   let file = $state.raw(null);
-  let fileMeta = $state('Fotos oder Dateien');
-  let status = $state('Bereit');
+  let fileMeta = $state('Photos or Files');
+  let status = $state('Ready');
   let stageNum = $state('');
   let progress = $state(0);
   let notice = $state('');
@@ -73,14 +73,14 @@
 
   // ---- transcript ------------------------------------------------------------
   const EXAMPLES = [
-    { start: 0, lang: 'de', text: 'Okay, kurzer Rundgang durch die neue Werkstatt. Links die Drehbank, die haben wir letzte Woche endlich angeschlossen.' },
+    { start: 0, lang: 'en', text: 'Okay, quick tour of the new workshop. On the left the lathe, we finally got it hooked up last week.' },
     { start: 27, lang: 'en', text: 'And for the folks watching from the Austin team: this is the fixture we talked about on Monday\'s call.' },
-    { start: 55, lang: 'de', text: 'Die Spannvorrichtung hält jetzt bis zu vier Teile gleichzeitig, das spart uns pro Schicht locker eine Stunde.' },
+    { start: 55, lang: 'en', text: 'The clamp now holds up to four parts at once, which easily saves us an hour per shift.' },
   ];
   let example = $state(true);
   let segments = $state([]);
-  let tag = $state('Beispiel');
-  let copyLabel = $state('Text kopieren');
+  let tag = $state('Example');
+  let copyLabel = $state('Copy text');
   let segmentsEl;
   let fileInput;
 
@@ -93,17 +93,17 @@
   async function copy() {
     try {
       await navigator.clipboard.writeText(plainText);
-      copyLabel = 'Kopiert ✓';
+      copyLabel = 'Copied ✓';
     } catch {
       const range = document.createRange();
       range.selectNodeContents(segmentsEl);
       const sel = getSelection();
       sel.removeAllRanges();
       sel.addRange(range);
-      copyLabel = 'Markiert, jetzt kopieren';
+      copyLabel = 'Selected, copy it now';
     }
     clearTimeout(copyTimer);
-    copyTimer = setTimeout(() => (copyLabel = 'Text kopieren'), 2000);
+    copyTimer = setTimeout(() => (copyLabel = 'Copy text'), 2000);
   }
 
   // ---- file selection ------------------------------------------------------
@@ -120,11 +120,11 @@
     clockDone = 0;
     clockTotal = null;
     progress = 0;
-    status = 'Bereit';
+    status = 'Ready';
     stageNum = '';
     // Safari has to hold the whole file and its decoded audio in memory at once.
     notice = file.size > 1e9
-      ? 'Das ist ein großes Video. Safari kann dabei der Speicher ausgehen, dann lädt die Seite neu. Falls das passiert: das Video vorher in Fotos kürzen oder in geringerer Auflösung exportieren.'
+      ? 'This is a large video. Safari may run out of memory on it and reload the page. If that happens, trim the video in Photos first or export it at a lower resolution.'
       : '';
   }
 
@@ -178,7 +178,7 @@
   function stop() {
     stopRequested = true;
     worker?.postMessage({ type: 'cancel' });
-    status = 'Stoppe nach diesem Teil …';
+    status = 'Stopping after this part …';
   }
 
   function act() {
@@ -195,15 +195,15 @@
     notice = '';
     chunkState = [];
     progress = 0;
-    status = 'Video wird gelesen …';
+    status = 'Reading video …';
     stageNum = '';
 
     let audio;
     try {
       audio = await decode(await file.arrayBuffer());
     } catch {
-      status = 'Ton konnte nicht gelesen werden';
-      notice = 'Safari konnte die Tonspur dieser Datei nicht lesen. Exportiere das Video noch einmal aus Fotos oder teile es als Audiodatei (zum Beispiel .m4a).';
+      status = 'Could not read the audio';
+      notice = 'Safari could not read the audio track of this file. Export the video from Photos again, or share it as an audio file (for example .m4a).';
       phase = 'ready';
       holdScreen(false);
       return;
@@ -238,7 +238,7 @@
 
     // Stop was tapped while the video was still being read.
     if (stopRequested) {
-      finish('Gestoppt');
+      finish('Stopped');
       return;
     }
 
@@ -252,8 +252,8 @@
     // syntax error): no message will ever come, so end the run here.
     w.onerror = (e) => {
       e.preventDefault();
-      finish('Etwas ist schiefgelaufen');
-      notice = 'Der Transkriptions-Worker konnte nicht gestartet werden. App einmal ganz schließen und neu öffnen.';
+      finish('Something went wrong');
+      notice = 'The transcription worker could not be started. Close the app completely and open it again.';
       w.terminate();
       if (worker === w) worker = null;
     };
@@ -262,15 +262,15 @@
       switch (data.type) {
         case 'stage':
           if (data.stage === 'loading') {
-            status = 'Sprachmodell wird geladen …';
+            status = 'Loading speech model …';
           } else {
-            status = `Höre zu · Teil 1 von ${runChunks.length}`;
+            status = `Listening · part 1 of ${runChunks.length}`;
             stageNum = '';
             progress = 0;
           }
           break;
         case 'download':
-          status = 'Modell wird geladen · nur beim ersten Mal';
+          status = 'Downloading model · first time only';
           stageNum = `${mb(data.loaded)} / ${mb(data.total)}`;
           progress = (100 * data.loaded) / data.total;
           break;
@@ -286,21 +286,21 @@
           const left = speaking - doneSpeaking;
           const eta = doneSpeaking ? (spentMs / doneSpeaking) * left / 1000 : NaN;
           progress = (100 * (data.index + 1)) / runChunks.length;
-          stageNum = left > 0 && isFinite(eta) ? `noch ≈${duration(eta)}` : '';
+          stageNum = left > 0 && isFinite(eta) ? `≈${duration(eta)} left` : '';
           if (data.index + 1 < runChunks.length && !stopRequested) {
-            status = `Höre zu · Teil ${data.index + 2} von ${runChunks.length}`;
+            status = `Listening · part ${data.index + 2} of ${runChunks.length}`;
           }
           break;
         }
         case 'done':
-          finish(`Fertig in ${duration((performance.now() - started) / 1000)}`);
+          finish(`Done in ${duration((performance.now() - started) / 1000)}`);
           break;
         case 'cancelled':
-          finish('Gestoppt');
+          finish('Stopped');
           break;
         case 'error':
-          finish('Etwas ist schiefgelaufen');
-          notice = `${data.text}. Falls das beim Laden des Modells passiert ist: Verbindung prüfen und nochmal versuchen. Mit eingeschalteter GPU: einmal ohne probieren.`;
+          finish('Something went wrong');
+          notice = `${data.text}. If this happened while loading the model, check the connection and try again. With the GPU on, try once without it.`;
           w.terminate();
           if (worker === w) worker = null;
           break;
@@ -318,14 +318,9 @@
 <svelte:document onvisibilitychange={onVisibility} />
 
 <div class="tonspur">
-  <header class="head">
-    <h2>Tonspur</h2>
-    <p class="sub mono">Video → Text · auf dem Gerät</p>
-  </header>
-
   <label class="stage">
-    <input bind:this={fileInput} type="file" accept="video/*,audio/*" aria-label="Video wählen" disabled={busy} onchange={pick}>
-    <span class="meta mono"><span>{file ? file.name : 'Noch kein Video'}</span><span>{fileMeta}</span></span>
+    <input bind:this={fileInput} type="file" accept="video/*,audio/*" aria-label="Choose video" disabled={busy} onchange={pick}>
+    <span class="meta mono"><span>{file ? file.name : 'No video yet'}</span><span>{fileMeta}</span></span>
     <span class="wave" class:has-file={!!file} aria-hidden="true">
       {#each bars as bar, b (b)}
         <i class:done={bar.done} style:height="{bar.height}%"></i>
@@ -334,7 +329,7 @@
         <span class="empty">
           <span>
             <b><svg width="30" height="30" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="2" y="4" width="11" height="12" rx="2"/><path d="M13 8.5l5-2.5v8l-5-2.5"/></svg></b>
-            Tippen, um ein Video zu wählen
+            Tap to choose a video
           </span>
         </span>
       {/if}
@@ -349,13 +344,13 @@
     </span>
   </label>
 
-  <section class="settings" aria-label="Einstellungen">
+  <section class="settings" aria-label="Settings">
     <div class="chips">
       <button
         class="chip"
         type="button"
         data-testid="chip-model"
-        aria-label="Modell: {MODELS[settings.model][0]}, {MODELS[settings.model][1]}"
+        aria-label="Model: {MODELS[settings.model][0]}, {MODELS[settings.model][1]}"
         disabled={busy}
         onclick={cycleModel}
       >{MODELS[settings.model][0]}<small class="mono">{MODELS[settings.model][1]}</small></button>
@@ -363,7 +358,7 @@
         class="chip"
         type="button"
         data-testid="chip-lang"
-        aria-label="Sprache: {LANGS[settings.lang]}"
+        aria-label="Language: {LANGS[settings.lang]}"
         disabled={busy}
         onclick={cycleLang}
       >{LANGS[settings.lang]}</button>
@@ -371,34 +366,34 @@
         class="chip"
         type="button"
         data-testid="chip-gpu"
-        aria-label="Läuft auf: {settings.gpu ? 'GPU' : 'CPU'}"
-        title={hasGpu ? undefined : 'Dieser Browser hat kein WebGPU'}
+        aria-label="Runs on: {settings.gpu ? 'GPU' : 'CPU'}"
+        title={hasGpu ? undefined : 'This browser has no WebGPU'}
         disabled={busy || !hasGpu}
         onclick={toggleGpu}
       >{settings.gpu ? 'GPU' : 'CPU'}</button>
-      <span class="hint">zum Ändern tippen</span>
+      <span class="hint">tap to change</span>
     </div>
     <div class="notice" data-testid="notice" hidden={!notice}>{notice}</div>
   </section>
 
-  <section class="transcript" class:example aria-label="Transkript">
+  <section class="transcript" class:example aria-label="Transcript">
     <div class="transcript-head">
-      <h3 class="mono">Transkript · {tag}</h3>
+      <h3 class="mono">Transcript · {tag}</h3>
       <button class="copy" type="button" data-testid="copy" hidden={example || !plainText} onclick={copy}>{copyLabel}</button>
     </div>
     <div class="segments" data-testid="segments" bind:this={segmentsEl}>
       {#each shown as seg, i (i)}
         <div class="segment" class:current={i === currentIndex} class:quiet={!seg.text}>
           <div class="tc mono">{timecode(seg.start)}{seg.lang ? ` · ${seg.lang.toUpperCase()}` : ''}</div>
-          <p>{seg.text || 'Keine Sprache'}</p>
+          <p>{seg.text || 'No speech'}</p>
         </div>
       {/each}
     </div>
   </section>
 
   <footer>
-    <p>Der Ton verlässt nie dieses Gerät. Heruntergeladen wird nur das Sprachmodell, von Hugging Face, beim ersten Mal. Danach bleibt es auf dem Gerät gespeichert.</p>
-    <p>Lass den Bildschirm an und diese Seite offen, solange es läuft. iOS pausiert Tabs im Hintergrund.</p>
+    <p>The audio never leaves this device. Only the speech model is downloaded, from Hugging Face, the first time. After that it stays on the device.</p>
+    <p>Keep the screen on and this page open while it runs. iOS pauses tabs in the background.</p>
   </footer>
 
   <div class="dock">
@@ -408,15 +403,13 @@
 
 <style>
   .tonspur {
-    max-width: 620px; margin: 0 auto;
-    padding: 28px var(--gutter-r) 0 var(--gutter);
-    display: grid; gap: 22px;
+    flex: 1;
+    width: 100%; max-width: 620px; margin: 0 auto;
+    padding: 20px var(--gutter-r) 0 var(--gutter);
+    display: grid; gap: 20px;
     grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto auto auto 1fr;
   }
-
-  .head { display: grid; gap: 4px; }
-  h2 { margin: 0; font-size: 34px; line-height: 1.1; font-weight: 600; letter-spacing: -0.025em; }
-  .sub { margin: 0; font-size: 12px; color: var(--muted); }
 
   /* waveform stage, an index card */
   .stage {
@@ -425,7 +418,7 @@
     padding: 14px 16px 16px;
     background: var(--card);
     border: 1px solid var(--line);
-    border-radius: 6px;
+    border-radius: 14px;
     cursor: pointer;
   }
   .stage input { position: absolute; opacity: 0; width: 1px; height: 1px; pointer-events: none; }
@@ -464,12 +457,12 @@
   .chip {
     display: flex; align-items: baseline; gap: 6px;
     background: var(--card); border: 1px solid var(--line); color: var(--ink);
-    border-radius: 8px; padding: 9px 12px; font-size: 14px; font-weight: 500; line-height: 1.5;
+    border-radius: 10px; padding: 9px 12px; font-size: 14px; font-weight: 500; line-height: 1.5;
   }
   .chip small { font-size: 11px; color: var(--muted); }
   .chip:disabled { opacity: 0.45; }
   .hint { align-self: center; font-size: 12px; color: var(--faint); }
-  .notice { background: var(--warn-soft); color: var(--warn); border-radius: 6px; padding: 10px 12px; font-size: 14px; }
+  .notice { background: var(--warn-soft); color: var(--warn); border-radius: 10px; padding: 10px 12px; font-size: 14px; }
 
   /* transcript */
   .transcript { display: grid; gap: 14px; border-top: 1px solid var(--line); padding-top: 20px; }
@@ -491,25 +484,26 @@
   .segment.current p { font-size: 21px; color: var(--ink); }
   .segment.quiet p { font-style: italic; color: var(--faint); }
 
-  footer { color: var(--muted); font-size: 13px; max-width: 62ch; }
+  footer { padding: 0 2px; color: var(--muted); font-size: 13px; }
   footer p { margin: 0 0 6px; }
 
   /* The action button rides along the bottom of the page. Sticky, not fixed:
-     the page is one of several side by side, and a fixed button would show on
-     all of them. */
+     every opened tool stays mounted in its own page, and a fixed button would
+     show on all of them. */
   .dock {
     position: sticky; bottom: 0; z-index: 1;
+    align-self: end;
     margin: 0 calc(-1 * var(--gutter-r)) 0 calc(-1 * var(--gutter));
-    padding: 30px var(--gutter-r) max(22px, env(safe-area-inset-bottom)) var(--gutter);
+    padding: 28px var(--gutter-r) max(26px, env(safe-area-inset-bottom)) var(--gutter);
     display: flex; justify-content: center;
-    background: linear-gradient(transparent, var(--paper) 30px);
+    background: linear-gradient(transparent, var(--bg) 36px);
     pointer-events: none;
   }
   .fab {
     pointer-events: auto;
-    height: 56px; padding: 0 30px; border: 0; border-radius: 28px;
+    height: 56px; padding: 0 40px; border: 0; border-radius: 28px;
     font-size: 17px; font-weight: 600;
-    background: var(--ink); color: var(--paper);
+    background: var(--off); color: var(--faint);
   }
   .fab.go { background: var(--accent); color: var(--on-accent); }
   .fab.stop { background: transparent; color: var(--ink); border: 1.5px solid var(--ink); }
