@@ -129,6 +129,10 @@
           {@render command('clean')}
           {@render command('fetch')}
           {@render command('check')}
+          <p class="note">
+            Paste each line on its own. a-Shell garbles long pasted lines that wrap over several rows,
+            also commands copied from elsewhere. If one breaks apart, type it by hand.
+          </p>
         </div>
       </li>
       <li>
@@ -237,6 +241,7 @@
   .n { font-size: 13px; line-height: 1.6; color: var(--accent); }
   .setup li > div { display: grid; gap: 8px; min-width: 0; }
   .setup p { margin: 0; font-size: 15px; text-wrap: pretty; }
+  .setup p.note { font-size: 13px; color: var(--muted); }
   .cmd {
     display: flex; align-items: flex-start; gap: 8px;
     background: var(--card); border: 1px solid var(--line); border-radius: 10px;
