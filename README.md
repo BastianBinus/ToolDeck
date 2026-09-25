@@ -40,4 +40,5 @@ Vertrag für jede Komponente:
 
 - Die e2e-Tests laufen in Chromium mit iPhone-Viewport. Echtes WebKit/iOS-Safari testen sie nicht.
 - Tonspur lädt transformers.js von jsDelivr und die Modelle von Hugging Face. Beides wird beim ersten Lauf gecacht, danach läuft es offline.
+- Updates greifen erst, wenn die App komplett geschlossen wurde (App-Umschalter → wegwischen). Eine offene App übernimmt eine neue Version absichtlich nicht, weil sonst die Dateien ihrer lazy geladenen Werkzeuge verschwinden würden.
 - Tonspur läuft single-threaded, weil GitHub Pages keine COOP/COEP-Header senden kann.

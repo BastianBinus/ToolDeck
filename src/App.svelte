@@ -30,27 +30,27 @@
     if (location.hash !== hash) history.replaceState(null, '', location.pathname + location.search + hash);
   });
 
+  // The page that covers most of the deck is the current one. Worked out from
+  // the scroll position rather than IntersectionObserver, whose isIntersecting
+  // WebKit reports true for pages that merely touch the edge.
+  function onScroll() {
+    const index = Math.round(deck.scrollLeft / deck.clientWidth);
+    if (index !== current && index >= 0 && index < pages.length) current = index;
+  }
+
+  function onHash() {
+    const index = pages.findIndex((p) => `#${p.id}` === location.hash);
+    go(Math.max(0, index));
+  }
+
   onMount(() => {
     if (start > 0) go(start, false);
-
-    // The page that covers most of the deck is the current one. Scroll-snap
-    // settles on exactly one, so the threshold only has to be above half.
-    const io = new IntersectionObserver(
-      (entries) => {
-        for (const e of entries) if (e.isIntersecting) current = Number(e.target.dataset.index);
-      },
-      { root: deck, threshold: 0.6 },
-    );
-    for (const el of deck.children) io.observe(el);
 
     // Rotating the phone changes the page width; keep the same page in view.
     const ro = new ResizeObserver(() => go(current, false));
     ro.observe(deck);
 
-    return () => {
-      io.disconnect();
-      ro.disconnect();
-    };
+    return () => ro.disconnect();
   });
 </script>
 
@@ -73,7 +73,9 @@
   </nav>
 </header>
 
-<main class="deck" bind:this={deck}>
+<svelte:window onhashchange={onHash} />
+
+<main class="deck" bind:this={deck} onscroll={onScroll}>
   <section class="page" data-index="0" aria-label="Übersicht" inert={current !== 0}>
     <Home {tools} open={(i) => go(i + 1)} />
   </section>
@@ -86,7 +88,11 @@
         {:then Tool}
           <Tool active={current === i + 1} />
         {:catch}
-          <p class="loading mono">{tool.name} konnte nicht geladen werden. Offline?</p>
+          <!-- Browsers remember a failed module import by URL, so only a reload retries it. -->
+          <p class="loading mono">
+            {tool.name} konnte nicht geladen werden. Offline?
+            <button type="button" class="retry" onclick={() => location.reload()}>Neu laden</button>
+          </p>
         {/await}
       {/if}
     </section>
@@ -118,7 +124,7 @@
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
   .tick {
-    width: 22px; height: 32px; border: 0; padding: 0; background: none;
+    width: 22px; height: 44px; border: 0; padding: 0; background: none;
     display: grid; place-items: center;
   }
   .tick::after {
@@ -140,12 +146,20 @@
     flex: 0 0 100%;
     min-width: 0;
     overflow-y: auto;
+    /* Something too wide inside a tool must not turn the page into a second
+       horizontal scroller competing with the deck. */
+    overflow-x: clip;
     overscroll-behavior-y: contain;
     scroll-snap-align: start;
     /* One page per swipe, even on a hard fling. */
     scroll-snap-stop: always;
   }
 
+  .retry {
+    display: block; margin-top: 12px;
+    border: 1px solid var(--line); background: var(--card);
+    border-radius: 8px; padding: 8px 12px; font-size: 14px;
+  }
   .loading { padding: 28px var(--gutter-r) 0 var(--gutter); color: var(--muted); font-size: 13px; }
 
   @media (prefers-reduced-motion: reduce) {

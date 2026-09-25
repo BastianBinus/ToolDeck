@@ -169,3 +169,35 @@ test('a tool mounts on first visit and stays mounted after swiping back', async 
   await expect(page.getByTestId('tonspur-action')).toHaveCount(1);
   await expect(tonspurPage(page)).toHaveAttribute('inert');
 });
+
+test('changing only the hash moves the deck', async ({ page }) => {
+  await page.goto('./');
+  await expectOnPage(page, 0);
+  await page.evaluate(() => { location.hash = '#tonspur'; });
+  await expectOnPage(page, 1);
+  await expect(label(page)).toHaveText('01 · Tonspur');
+});
+
+test('home stays current and usable after load (no stray page switch)', async ({ page }) => {
+  await page.goto('./');
+  await expect(label(page)).toHaveText('00 · Übersicht');
+  await expect(page.locator('section.page[data-index="0"]')).not.toHaveAttribute('inert', /.*/);
+  await expect(page.getByTestId('tonspur-action')).toHaveCount(0);
+  expect(await page.evaluate(() => location.hash)).toBe('');
+});
+
+test('a tool whose code fails to load can be retried', async ({ page }) => {
+  let failed = 0;
+  await page.route(/\/assets\/Tonspur-[^/]+\.js$/, (route) => {
+    if (failed++ === 0) return route.abort();
+    return route.continue();
+  });
+  await page.goto('./');
+  await page.getByRole('button', { name: /Tonspur/ }).first().tap();
+  await expect(tonspurPage(page)).toContainText('konnte nicht geladen werden');
+
+  // Reloads on the tool's page (the hash is kept) and loads it this time.
+  await tonspurPage(page).getByRole('button', { name: 'Neu laden' }).tap();
+  await expect(page.getByTestId('tonspur-action')).toBeVisible();
+  expect(failed).toBe(2);
+});

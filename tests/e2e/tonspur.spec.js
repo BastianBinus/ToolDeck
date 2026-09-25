@@ -202,6 +202,17 @@ test.describe('with the fake worker', () => {
     expect(workers[1].messages.map((m) => m.type)).toEqual(['run']);
   });
 
+  test('a worker script that never loads ends the run instead of hanging', async ({ page }) => {
+    await openTonspur(page);
+    await setMode(page, 'loadfail');
+    await run(page, LOUD_65());
+
+    await expect(status(page)).toHaveText('Etwas ist schiefgelaufen');
+    await expect(notice(page)).toBeVisible();
+    await expect(action(page)).toHaveText('Nochmal');
+    await expect.poll(async () => (await fakeWorkers(page))[0].terminated).toBe(true);
+  });
+
   test('a file without readable audio fails before any worker starts', async ({ page }) => {
     await openTonspur(page);
     await run(page, GARBAGE());

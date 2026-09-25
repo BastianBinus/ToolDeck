@@ -136,16 +136,23 @@
 
   async function holdScreen(on) {
     try {
-      if (on && 'wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen');
-      else if (!on && wakeLock) { await wakeLock.release(); wakeLock = null; }
+      if (on && 'wakeLock' in navigator) {
+        const lock = await navigator.wakeLock.request('screen');
+        // The run can end (stop, decode failure) while the request is pending.
+        if (phase === 'running' && !destroyed) wakeLock = lock;
+        else lock.release();
+      } else if (!on && wakeLock) { await wakeLock.release(); wakeLock = null; }
     } catch { /* not granted: the footer already asks to keep the screen on */ }
   }
 
   // The browser drops the wake lock whenever the page is hidden; take it again
-  // when the page comes back while a run is still going.
+  // when the page comes back while a run is still going. An idle model is let go
+  // when the app goes to the background, where iOS is quickest to kill it.
   function onVisibility() {
     if (document.visibilityState === 'visible' && phase === 'running' && (!wakeLock || wakeLock.released)) {
       holdScreen(true);
+    } else if (document.visibilityState === 'hidden' && phase !== 'running') {
+      dropWorker();
     }
   }
 
@@ -235,8 +242,21 @@
       return;
     }
 
+    // Ask once to keep the downloaded models; Safari decides without a prompt.
+    navigator.storage?.persist?.().catch(() => {});
+
     worker ??= new Worker(new URL('./worker.js', import.meta.url), { type: 'module' });
     const w = worker;
+
+    // The worker script itself failed to load (offline on a stale build, or a
+    // syntax error): no message will ever come, so end the run here.
+    w.onerror = (e) => {
+      e.preventDefault();
+      finish('Etwas ist schiefgelaufen');
+      notice = 'Der Transkriptions-Worker konnte nicht gestartet werden. App einmal ganz schließen und neu öffnen.';
+      w.terminate();
+      if (worker === w) worker = null;
+    };
 
     w.onmessage = ({ data }) => {
       switch (data.type) {
@@ -391,6 +411,7 @@
     max-width: 620px; margin: 0 auto;
     padding: 28px var(--gutter-r) 0 var(--gutter);
     display: grid; gap: 22px;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .head { display: grid; gap: 4px; }
@@ -428,8 +449,8 @@
     background: var(--ink); color: var(--paper);
     display: grid; place-items: center;
   }
-  .clock { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; }
-  .clock .tc { font-size: 44px; line-height: 1; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .clock { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 12px; }
+  .clock .tc { font-size: clamp(28px, 10vw, 44px); line-height: 1; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; white-space: nowrap; }
   .clock .tc small { font-size: 16px; color: var(--faint); letter-spacing: 0; }
   .clock .num { font-size: 12px; color: var(--muted); text-align: right; padding-bottom: 4px; font-variant-numeric: tabular-nums; }
   .progress { display: grid; gap: 8px; }

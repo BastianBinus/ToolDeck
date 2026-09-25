@@ -10,7 +10,9 @@ export default defineConfig({
   plugins: [
     svelte(),
     VitePWA({
-      registerType: 'autoUpdate',
+      // A new version waits until the app is fully closed. autoUpdate would take
+      // over an open app and delete the chunks its lazy tools still need.
+      registerType: 'prompt',
       includeAssets: ['favicon.svg', 'apple-touch-icon.png'],
       manifest: {
         name: 'ToolDeck',
@@ -36,7 +38,9 @@ export default defineConfig({
             handler: 'CacheFirst',
             options: {
               cacheName: 'cdn',
-              cacheableResponse: { statuses: [0, 200] },
+              cacheableResponse: { statuses: [200] },
+              // Old transformers.js/onnxruntime versions age out after an upgrade.
+              expiration: { maxEntries: 20, maxAgeSeconds: 60 * 60 * 24 * 90 },
             },
           },
         ],

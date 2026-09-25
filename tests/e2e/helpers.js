@@ -55,6 +55,7 @@ export const GARBAGE = () => {
 //   'ok'    loading → download → transcribing → one segment per chunk → done
 //   'slow'  like ok, but after the first segment waits for {type:'cancel'}
 //   'error' loading → error
+//   'loadfail' the worker script never loads: an error event, no messages
 // Segment text for a spoken chunk i is `Teil ${i + 1} gesprochen.`, language
 // alternating de/en; silent chunks give text '' and lang null, like worker.js.
 export async function installFakeWorker(page, mode = 'ok') {
@@ -125,6 +126,13 @@ export async function installFakeWorker(page, mode = 'ok') {
       async _run({ chunks }) {
         const mode = window.__fakeMode;
         this._runChunks = chunks;
+        if (mode === 'loadfail') {
+          await new Promise((r) => setTimeout(r, 20));
+          const ev = new ErrorEvent('error', { message: 'worker script failed to load', cancelable: true });
+          this.onerror?.(ev);
+          this.dispatchEvent(ev);
+          return;
+        }
         await this._later(20, { type: 'stage', stage: 'loading' });
         if (mode === 'error') {
           await this._later(20, { type: 'error', text: 'Failed to fetch' });
