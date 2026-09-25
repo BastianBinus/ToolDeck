@@ -490,7 +490,7 @@
     font-size: 17px; font-weight: 600;
     background: var(--ink); color: var(--paper);
   }
-  .fab.go { background: var(--accent); color: #fffaf6; }
+  .fab.go { background: var(--accent); color: var(--on-accent); }
   .fab.stop { background: transparent; color: var(--ink); border: 1.5px solid var(--ink); }
 
   @media (prefers-reduced-motion: reduce) {

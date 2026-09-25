@@ -7,7 +7,9 @@
   const pages = [{ id: 'home', name: 'Übersicht' }, ...tools];
 
   let deck;
-  let current = $state(0);
+  // Read the deep link before the hash-writing effect below first runs.
+  const start = Math.max(0, pages.findIndex((p) => `#${p.id}` === location.hash));
+  let current = $state(start);
   // A tool is loaded the first time its page comes up and stays mounted after.
   let opened = $state({});
   const modules = {};
@@ -29,11 +31,7 @@
   });
 
   onMount(() => {
-    const start = pages.findIndex((p) => `#${p.id}` === location.hash);
-    if (start > 0) {
-      current = start;
-      go(start, false);
-    }
+    if (start > 0) go(start, false);
 
     // The page that covers most of the deck is the current one. Scroll-snap
     // settles on exactly one, so the threshold only has to be above half.
